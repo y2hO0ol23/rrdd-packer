@@ -26,11 +26,9 @@ def start(file:str)->None:
         section = pe.sections[i]
 
         res, tree = pack.run(section.PointerToRawData, section.SizeOfRawData)
-        
-        print(res)
-        print(tree)
-        
 
+        print(hex(section.VirtualAddress))
+        
 
 if __name__ == "__main__":
     error.send(error.USAGE)
