@@ -21,7 +21,6 @@ except:
 
 from utils import error
 
-
 def main()->None:
     if len(sys.argv) != 2:
         error.send(error.USAGE)
