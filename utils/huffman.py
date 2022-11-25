@@ -7,18 +7,10 @@ class Node():
         else:
             self.left = argv[0]
             self.right = argv[1]
-            print
-            self.freq = self.frequency()
-    
-
-    def frequency(self, depth = 1):
-        if self.left == None:
-            return self.freq * depth
-        else:
-            return self.left.frequency(depth+1) + self.right.frequency(depth+1) 
+            self.freq = self.left.freq + self.right.freq
 
 
-    def result(self, value = ""):
+    def result(self, value:str = "")->dict:
         if self.left == None:
             return {self.val : value}
         else:

@@ -1,20 +1,18 @@
 from utils import error, huffman
 from queue import PriorityQueue
 
-global fd
+global fd, tree
 
-def set(file)->None:
+
+def init(pack_range:bytes)->PriorityQueue:
     global fd
 
-    fd = open(file, 'rb')
-
-
-def init(data:bytes)->PriorityQueue:
     res = [0 for _ in range(0x100)]
     pq = PriorityQueue()
 
-    for item in data:
-        res[item] += 1
+    for st, ed in pack_range:
+        for i in range(st, ed):
+            res[fd[i]] += 1
 
     for val, cnt in enumerate(res):
         if cnt != 0:
@@ -42,11 +40,19 @@ def bytetree(tree:dict)->bytes:
 
     bytetree = b""
     binary = ""
-    for i in range(1, nodeNumber + 1):
+    count = 0
+    for i in range(1, last + 1):
         if i in save:
-            binary += "1" + bin(i)[2:].zfill(8)
+            if count > 0:
+                v = count.to_bytes(2,'little')
+                binary += "0" + bin(v[0])[2:].zfill(8) + bin(v[1])[2:].zfill(8)
+                count = 0
+            binary += "1" + bin(save[i])[2:].zfill(8)
         else:
-            binary += "0"
+            count += 1
+            if count == 0xffff:
+                binary += "0" + "1"*16
+                count = 0
         
         while len(binary) > 8:
             bytetree += bytes([int(binary[:8], 2)])
@@ -55,12 +61,12 @@ def bytetree(tree:dict)->bytes:
     if len(binary) > 0:
         bytetree += bytes([int(binary.rjust(8,'0'), 2)])
     
-    print(len(bytetree))
-    return bytes([len(bytetree)]) + bytetree
+    size = len(bytetree)
+    return size.to_bytes(2,'little') + bytetree
 
 
-def build_tree(data:bytes)->dict:
-    pq = init(data)
+def build_tree(pack_range:list)->dict:
+    pq = init(pack_range)
 
     while pq.qsize() > 1:
         left = pq.get()[1]
@@ -89,16 +95,33 @@ def pack(data:bytes, tree:dict)->bytes:
     return res
 
 
-def run(start:int, size:int)->tuple:
-    global fd
+def set(file:str, sections:list)->bytes:
+    global fd, tree
 
-    end = start + size
-    data = b"".join(fd.readlines())[start:end]
+    with open(file, 'rb') as f:
+        fd = b"".join(f.readlines())
+        f.close()
+    open(file+'.backup', 'wb').write(fd)
+
+    pack_range = []
+    for section in sections:
+        size = section.SizeOfRawData
+        raw = section.PointerToRawData
+        pack_range.append([raw,raw+size])
     
-    tree = build_tree(data)
+    tree = build_tree(pack_range)
+
+    return bytetree(tree)
+
+
+def run(start, size)->bytes:
+    global fd, tree
+    
+    data = fd[start:start+size]
+
     res = pack(data, tree)
 
-    return res, bytetree(tree)
+    return res
 
 
 if __name__ == "__main__":

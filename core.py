@@ -1,34 +1,49 @@
 import pefile
+import os
 
 import pack
+import repair
 
 from utils import error
 import utils.pe
+import copy
 
-def select_section(sections:list)->list:
-    can_pack = []
-
-    for i, section in enumerate(sections):
-        if not utils.pe.can_write(section) and utils.pe.can_execute(section):
-            can_pack.append(i)
-    
-    return can_pack
+class form:
+    def __init__(self, offset, data, rva, option):
+        self.offset = offset
+        self.data = data
+        self.rva = rva
+        self.option = option
 
 
 def start(file:str)->None:
-    try:    pe = pefile.PE(file)
-    except: error.send("file : pe format error")
+    try:
+        fd = b"".join(open(file, 'rb').readlines())
+        print(fd)
+        open(file+'.backup', 'wb').write(fd)
+        pe = pefile.PE(file+'.backup')
+    except: 
+        os.remove(file+'.backup')
+        error.send("file : pe format error")
+    
+    tree = pack.set(file, pe.sections)
 
-    pack_list = select_section(pe.sections)
+    packed = []
+    last = 0
+    for section in pe.sections:
+        raw = section.PointerToRawData
+        size = section.SizeOfRawData
+        res = pack.run(raw, size)
 
-    pack.set(file)
-    for i in pack_list:
-        section = pe.sections[i]
+        rva = section.VirtualAddress
+        option = section.Characteristics
 
-        res, tree = pack.run(section.PointerToRawData, section.SizeOfRawData)
+        packed.append(form(last, res, rva, option))
+        last += len(res)
+        print(section.Name, option)
+    
+    pe = repair.section(file, pe, last)
 
-        print(hex(section.VirtualAddress))
-        
 
 if __name__ == "__main__":
     error.send(error.USAGE)
