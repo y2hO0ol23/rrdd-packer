@@ -6,7 +6,6 @@ import repair
 
 from utils import error
 import utils.pe
-import copy
 
 class form:
     def __init__(self, offset, data, rva, option):
@@ -16,16 +15,25 @@ class form:
         self.option = option
 
 
+def backup(file:str)->None:
+    backup_name = file+'.backup'
+
+    fd = b"".join(open(file, 'rb').readlines())
+    open(backup_name, 'wb').write(fd)
+
+    return backup_name
+
+
 def start(file:str)->None:
     try:
-        fd = b"".join(open(file, 'rb').readlines())
-        print(fd)
-        open(file+'.backup', 'wb').write(fd)
-        pe = pefile.PE(file+'.backup')
-    except: 
-        os.remove(file+'.backup')
-        error.send("file : pe format error")
+        pe = pefile.PE(file)
+    except: error.send("file : pe format error")
     
+    if pe.FILE_HEADER.NumberOfSections == 0:
+        error.send("file : no section!")
+    pe.close()
+    
+    pe = pefile.PE(backup(file))
     tree = pack.set(file, pe.sections)
 
     packed = []
@@ -40,9 +48,17 @@ def start(file:str)->None:
 
         packed.append(form(last, res, rva, option))
         last += len(res)
-        print(section.Name, option)
+
     
-    pe = repair.section(file, pe, last)
+    section = [
+        {
+            "name" : ".packed",
+            "data" : b"".join([i.data for i in packed]),
+            "rva" : last,
+            "Characteristics" : utils.pe.IMAGE_SCN_MEM_READ | utils.pe.IMAGE_SCN_CNT_INITIALIZED_DATA
+        }
+    ]
+    pe = repair.set_section(file, section)
 
 
 if __name__ == "__main__":

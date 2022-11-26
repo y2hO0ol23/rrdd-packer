@@ -98,10 +98,7 @@ def pack(data:bytes, tree:dict)->bytes:
 def set(file:str, sections:list)->bytes:
     global fd, tree
 
-    with open(file, 'rb') as f:
-        fd = b"".join(f.readlines())
-        f.close()
-    open(file+'.backup', 'wb').write(fd)
+    fd = b"".join(open(file, 'rb').readlines())
 
     pack_range = []
     for section in sections:
