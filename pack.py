@@ -22,8 +22,8 @@ def init(pack_range:bytes)->PriorityQueue:
     return pq
 
 
-def bytetree(tree:dict)->bytes:
-    last = 1
+def tree_data()->tuple:
+    size = 1
     save = {}
     for val in range(0x100):
         if val in tree:
@@ -33,36 +33,39 @@ def bytetree(tree:dict)->bytes:
                 if bit == "1":
                     nodeNumber += 1
             
-            if last < nodeNumber:
-                last = nodeNumber
+            if size < nodeNumber + 1:
+                size = nodeNumber + 1
             
             save[nodeNumber] = val
 
-    bytetree = b""
+    case_bin = b""
+    internal_data = b""
+    leaf_data = b""
     binary = ""
+    
+    case_size = 0
     count = 0
-    for i in range(1, last + 1):
+    for i in range(1, size):
         if i in save:
-            if count > 0:
-                v = count.to_bytes(2,'little')
-                binary += "0" + bin(v[0])[2:].zfill(8) + bin(v[1])[2:].zfill(8)
-                count = 0
-            binary += "1" + bin(save[i])[2:].zfill(8)
+            while count > 0:
+                binary += "0"
+                internal_data += (count & 0xffff).to_bytes(2,'little')
+                count //= 0x10000
+                case_size += 1
+            binary += "1"
+            leaf_data += bytes([save[i]])
+            case_size += 1
         else:
             count += 1
-            if count == 0xffff:
-                binary += "0" + "1"*16
-                count = 0
         
         while len(binary) > 8:
-            bytetree += bytes([int(binary[:8], 2)])
+            case_bin += bytes([int(binary[:8], 2)])
             binary = binary[8:]
     
     if len(binary) > 0:
-        bytetree += bytes([int(binary.rjust(8,'0'), 2)])
+        case_bin += bytes([int(binary.ljust(8,'0'), 2)])
     
-    size = len(bytetree)
-    return size.to_bytes(2,'little') + bytetree
+    return case_bin + internal_data + leaf_data, case_size, len(internal_data), size
 
 
 def build_tree(pack_range:list)->dict:
@@ -90,12 +93,12 @@ def pack(data:bytes, tree:dict)->bytes:
             binary = binary[8:]
     
     if len(binary) > 0:
-        res += bytes([int(binary.rjust(8,'0'), 2)])
+        res += bytes([int(binary.ljust(8,'0'), 2)])
     
     return res
 
 
-def set(file:str, sections:list)->bytes:
+def set(file:str, sections:list)->tuple:
     global fd, tree
 
     fd = b"".join(open(file, 'rb').readlines())
@@ -108,7 +111,7 @@ def set(file:str, sections:list)->bytes:
     
     tree = build_tree(pack_range)
 
-    return bytetree(tree)
+    return tree_data()
 
 
 def run(start, size)->bytes:

@@ -74,7 +74,7 @@ def set_section(file:str, section_list:list):
     header_end = t.pe.OPTIONAL_HEADER.SizeOfHeaders
     raw_pos = header_end
     for i, section in enumerate(section_list):
-        t.pe.sections[i].Name = (section["name"].rjust(8,'\x00')[:8]).encode()
+        t.pe.sections[i].Name = (section["name"].ljust(8,'\x00')[:8]).encode()
         t.pe.sections[i].Misc_VirtualSize = len(section["data"])
         t.pe.sections[i].VirtualAddress = section["rva"]
         t.pe.sections[i].SizeOfRawData = len(section["data"])
