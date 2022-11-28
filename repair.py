@@ -96,7 +96,7 @@ def set_section(file:str, section_list:list):
 
 def iat(file:str, address:int):
     m = MODIFY(file)
-    print(m.pe.OPTIONAL_HEADER.DATA_DIRECTORY[1].VirtualAddress)
     m.pe.OPTIONAL_HEADER.DATA_DIRECTORY[1].VirtualAddress = address
+    print(hex(address))
     m.set()
     m.close()
