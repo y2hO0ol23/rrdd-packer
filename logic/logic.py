@@ -1,6 +1,6 @@
 tree_data = eval("".join(open('tree_data','r').readlines()))
 case_size = 378
-internel_count = 258
+internal_count = 258
 tree_size = 29432
 
 packed = eval("".join(open('packed','r').readlines()))
@@ -17,12 +17,12 @@ data = [
 #############
 
 tree = [-1] * tree_size
-internel_offset = (case_size + 7) // 8
-leaf_offset = internel_offset + internel_count
+internal_offset = (case_size + 7) // 8
+leaf_offset = internal_offset + internal_count
 offset = 0b10000000
 
 node = 1
-internel_idx = 0
+internal_idx = 0
 leaf_idx = 0
 
 for i in range(case_size + 2):
@@ -34,10 +34,10 @@ for i in range(case_size + 2):
         leaf_idx += 1
         node += 1
     else:
-        # node += (WORD*)(&tree_data[internel_offset])[internel_idx]
-        idx = internel_offset + (internel_idx * 2)
+        # node += (WORD*)(&tree_data[internal_offset])[internal_idx]
+        idx = internal_offset + (internal_idx * 2)
         node += int.from_bytes(tree_data[idx:idx+2],'little')
-        internel_idx += 1
+        internal_idx += 1
 
     v <<= 1
 

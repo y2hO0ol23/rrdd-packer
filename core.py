@@ -37,10 +37,11 @@ def start(file:str)->None:
     
     # make backup and make tree
     pe = pefile.PE(backup(file))
-    tree_data, case_size, internel_count, tree_size = pack.set(file, pe.sections)
+    tree_data, case_size, internal_count, tree_size = pack.set_tree(file, pe.sections)
  
     packed = []
-    last = 0
+    raw_end = 0
+    rva_end = 0
     for section in pe.sections:
         raw = section.PointerToRawData
         size = section.SizeOfRawData
@@ -49,38 +50,36 @@ def start(file:str)->None:
         rva = section.VirtualAddress
         option = section.Characteristics
 
-        packed.append(form(last, size, res, rva, option))
-        last += len(res)
-
-    code = machine.build(packed)
+        packed.append(form(raw_end, size, res, rva, option))
+        raw_end += len(res)
+        rva_end = max(rva + size, rva_end)
 
     packed_data = b"".join([i.data for i in packed])
-    
+
+    iat_data = machine.make_iat(rva_end)
+
     section = [
         {
-            "name" : ".packed",
-            "data" : packed_data,
-            "rva" : last,
-            "Characteristics" : utils.pe.IMAGE_SCN_MEM_READ  | 
-                                utils.pe.IMAGE_SCN_MEM_WRITE | 
-                                utils.pe.IMAGE_SCN_CNT_INITIALIZED_DATA
-        },
-        {
-            "name" : ".tree",
-            "data" : tree_data,
-            "rva" : last + len(packed_data),
+            "name" : ".data",
+            "data" : iat_data + packed_data + tree_data,
+            "rva" : rva_end,
             "Characteristics" : utils.pe.IMAGE_SCN_MEM_READ  | 
                                 utils.pe.IMAGE_SCN_MEM_WRITE | 
                                 utils.pe.IMAGE_SCN_CNT_INITIALIZED_DATA
         }
     ]
+    
+    code = machine.build(section, len(iat_data), len(iat_data) + len(packed_data), case_size, internal_count, tree_size, pe.DIRECTORY_ENTRY_IMPORT)
+    
     pe = repair.set_section(file, section) 
     
-    print(tree_data)
-    print(case_size, internel_count, tree_size)
-    print(packed_data)
-    for i in packed:
-        print("[%d, %d, %d, %d]"%(i.offset,i.size,i.rva,i.option))
+    #print(tree_data)
+    #print(case_size, internal_count, tree_size)
+    #print(packed_data)
+    #for i in packed:
+    #    print("[%d, %d, %d, %d]"%(i.offset,i.size,i.rva,i.option))
+
+    repair.iat(file, rva_end)
 
 
 if __name__ == "__main__":

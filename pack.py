@@ -98,7 +98,7 @@ def pack(data:bytes, tree:dict)->bytes:
     return res
 
 
-def set(file:str, sections:list)->tuple:
+def set_tree(file:str, sections:list)->tuple:
     global fd, tree
 
     fd = b"".join(open(file, 'rb').readlines())
@@ -122,7 +122,7 @@ def run(start, size)->bytes:
     res = pack(data, tree)
 
     return res
-
+    
 
 if __name__ == "__main__":
     error.send(error.USAGE)
