@@ -3,25 +3,25 @@ from keystone import *
 func_rva = {}
 
 class asm():
-    def __init__(self):
+    def __init__(self, arch, mode):
+        self.ks = Ks(arch, mode)
         self.data = b""
     
     def write(self, code:bytes)->None:
-        self.data += b"\n"
-        self.data += code
+        encoding, count = self.ks.asm(code)
+        self.data += bytes(encoding)
 
 
-def make_iat(rva:int)->bytes:
+def make_iat(rva:int)->tuple:
     global func_rva
 
-    HINT = 0xbbaa
     dll_list = {
         b"api-ms-win-crt-heap-l1-1-0.dll":[
-            (HINT, b"calloc"),
-            (HINT, b"free")
+            (0, b"calloc"),
+            (0, b"free")
         ],
         b"KERNEL32.dll":[
-            (HINT, b'GetProcAddress')
+            (0, b'GetProcAddress')
         ]
     }
     descriptor = b""
@@ -40,21 +40,20 @@ def make_iat(rva:int)->bytes:
 
         INT = b""
         IAT = b""
-        print(dll_list[dll_name])
-        func_name_list = b"\x00".join(list(map(lambda x: x[1], dll_list[dll_name]))) + b'\x00'
+        func_name_list = b"\x00".join(list(map(lambda x: x[0].to_bytes(2, 'little') + x[1], dll_list[dll_name]))) + b'\x00'
         data += func_name_list
         INT_name_offset = 0
         for hint, func in dll_list[dll_name]:
             INT_name_rva = rva + offset + INT_name_offset
             func_rva[dll_name][func] = INT_name_rva
 
-            INT += hint.to_bytes(2, 'little') + INT_name_rva.to_bytes(4, 'little')
-            IAT += hint.to_bytes(2, 'little') + INT_name_rva.to_bytes(4, 'little')
+            INT += INT_name_rva.to_bytes(8, 'little')
+            IAT += INT_name_rva.to_bytes(8, 'little')
 
-            INT_name_offset += len(func) + 1
+            INT_name_offset += 2 + len(func) + 1
         
-        INT += b'\x00'*4
-        IAT += b'\x00'*4
+        INT += b'\x00'*8
+        IAT += b'\x00'*8
             
         INT_rva = rva + offset + len(func_name_list)
         IAT_rva = INT_rva + len(INT)
@@ -68,14 +67,18 @@ def make_iat(rva:int)->bytes:
         
         dll_name_rva += len(dll_name) + 1
 
-    return descriptor + b'\x00'*0x14 + dll_name_list + data
+    descriptor += b'\x00' * 0x14
+    return descriptor + dll_name_list + data, len(descriptor)
 
 
-def build(new_section_data:list, packed_offset:int, tree_offset:int, case_size:int, internal_count:int, tree_size:int, entry_list:list):    
-    """ks = Ks(KS_ARCH_X86, KS_MODE_32)
-    code = asm()
-    code.write(b'') # malloc(tree_size)
-    code.write(b'')
-    encoding, count = ks.asm(code)
-    """
-    pass
+def build(new_section_data:list, packed_offset:int, tree_offset:int, case_size:int, internal_count:int, tree_size:int, entry_list:list)->bytes:
+    print(hex(new_section_data[0]['rva'] + packed_offset))
+    code = asm(KS_ARCH_X86, KS_MODE_64)
+    
+    code.write(b'push rax')
+    code.write(b'push rbx')
+    code.write(b'pop rax')
+    code.write(b'pop rbx')
+    code.write(b'ret')
+
+    return code.data

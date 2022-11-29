@@ -44,8 +44,8 @@ def make_section(file:str, count:int):
     m.pe.OPTIONAL_HEADER.SizeOfHeaders = section_base + 0x28 * count
 
     # set alignments to 1
-    m.pe.OPTIONAL_HEADER.FileAlignment = 1
-    m.pe.OPTIONAL_HEADER.SectionAlignment = 1
+    m.pe.OPTIONAL_HEADER.FileAlignment = 0x200
+    m.pe.OPTIONAL_HEADER.SectionAlignment = 0x200
 
     m.set()
 
@@ -67,12 +67,16 @@ def make_section(file:str, count:int):
     open(file,'wb').write(items)
 
 
-def set_section(file:str, section_list:list):
+def set_section(file:str, section_list:list)->None:
     make_section(file, len(section_list))
 
     m = MODIFY(file)
     header_end = m.pe.OPTIONAL_HEADER.SizeOfHeaders
-    raw_pos = header_end
+    raw_start = utils.pe.align(header_end)
+
+    raw_pos = raw_start
+    raw_list = []
+    section_data = b""
     for i, section in enumerate(section_list):
         m.pe.sections[i].Name = (section["name"].ljust(8,'\x00')[:8]).encode()
         m.pe.sections[i].Misc_VirtualSize = len(section["data"])
@@ -85,18 +89,36 @@ def set_section(file:str, section_list:list):
         m.pe.sections[i].NumberOfLinenumbers = 0x0000
         m.pe.sections[i].Characteristics = section["Characteristics"]
 
-        raw_pos += len(section["data"])
-    
+        raw_list.append(raw_pos)
+        raw_pos = utils.pe.align(raw_pos + len(section["data"]))
+        section_data += section_list[i]["data"]
+        if i != len(section_list) - 1:
+            section_data += b'\x00'*(raw_pos - raw_start - len(section_data))
+
     m.set()
     m.close()
 
     fd = b"".join(open(file, 'rb').readlines())
-    open(file,'wb').write(fd[:header_end] + b"".join([i["data"] for i in section_list]) + fd[header_end:])
+    open(file,'wb').write(fd[:header_end] + b'\x00'*(raw_start - header_end) + section_data)
 
 
-def iat(file:str, address:int):
+def iat(file:str, address:int, size:int):
     m = MODIFY(file)
+    for i in range(len(m.pe.OPTIONAL_HEADER.DATA_DIRECTORY)):
+        m.pe.OPTIONAL_HEADER.DATA_DIRECTORY[i].VirtualAddress = 0
+        m.pe.OPTIONAL_HEADER.DATA_DIRECTORY[i].Size = 0
+
     m.pe.OPTIONAL_HEADER.DATA_DIRECTORY[1].VirtualAddress = address
-    print(hex(address))
+    m.pe.OPTIONAL_HEADER.DATA_DIRECTORY[1].Size = size
+
+    m.set()
+    m.close()
+
+
+def base(file:str, code_rva:int, data_rva):
+    m = MODIFY(file)
+    m.pe.OPTIONAL_HEADER.AddressOfEntryPoint = code_rva
+    m.pe.OPTIONAL_HEADER.BaseOfCode = code_rva
+    m.pe.OPTIONAL_HEADER.BaseOfData = code_rva
     m.set()
     m.close()

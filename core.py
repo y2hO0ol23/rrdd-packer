@@ -52,11 +52,11 @@ def start(file:str)->None:
 
         packed.append(form(raw_end, size, res, rva, option))
         raw_end += len(res)
-        rva_end = max(rva + size, rva_end)
+        rva_end = max(utils.pe.align(rva + size), rva_end)
 
     packed_data = b"".join([i.data for i in packed])
 
-    iat_data = machine.make_iat(rva_end)
+    iat_data, iat_descriptor_size = machine.make_iat(rva_end)
 
     section = [
         {
@@ -70,8 +70,16 @@ def start(file:str)->None:
     ]
     
     code = machine.build(section, len(iat_data), len(iat_data) + len(packed_data), case_size, internal_count, tree_size, pe.DIRECTORY_ENTRY_IMPORT)
-    
-    pe = repair.set_section(file, section) 
+    code_rva = utils.pe.align(rva_end + len(section[0]["data"]))
+    section.append({
+        "name" : ".text",
+        "data" : code,
+        "rva" : code_rva,
+        "Characteristics" : utils.pe.IMAGE_SCN_MEM_READ     |  
+                            utils.pe.IMAGE_SCN_MEM_EXECUTE  |
+                            utils.pe.IMAGE_SCN_CNT_CODE
+    })
+    repair.set_section(file, section)
     
     #print(tree_data)
     #print(case_size, internal_count, tree_size)
@@ -79,7 +87,8 @@ def start(file:str)->None:
     #for i in packed:
     #    print("[%d, %d, %d, %d]"%(i.offset,i.size,i.rva,i.option))
 
-    repair.iat(file, rva_end)
+    repair.iat(file, rva_end, iat_descriptor_size)
+    repair.base(file, code_rva, rva_end)
 
 
 if __name__ == "__main__":

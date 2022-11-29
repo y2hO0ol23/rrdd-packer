@@ -21,3 +21,6 @@ def is_386(cpu_ver):
 
 def is_A64(cpu_ver):
     return (cpu_ver & IMAGE_FILE_MACHINE_IA64) > 0
+
+def align(address:int)->int:
+    return ((address + 0x200 - 1) // 0x200) * 0x200
