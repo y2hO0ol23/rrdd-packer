@@ -71,9 +71,9 @@ def make_iat(rva:int)->tuple:
     return descriptor + dll_name_list + data, len(descriptor)
 
 
-def build(iat_data_rva:int, packed_data_rva:int, tree_data_rva:int, case_size:int, internal_count:int, tree_size:int, entry_list:list)->bytes:
+def build(packed_data_rva:int, tree_data_rva:int, case_size:int, internal_count:int, tree_size:int, entry_list:list)->bytes:
     global func_rva
-    
+
     code = asm(KS_ARCH_X86, KS_MODE_64)
     
     code.write(b'push rax')

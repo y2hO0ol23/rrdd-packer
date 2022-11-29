@@ -69,10 +69,9 @@ def start(file:str)->None:
         }
     ]
     
-    iat_data_rva = rva_end
-    packed_data_rva = iat_data_rva + len(iat_data)
+    packed_data_rva = rva_end + len(iat_data)
     tree_data_rva = packed_data_rva + len(packed_data)
-    code = machine.build(iat_data_rva, packed_data_rva, tree_data_rva, case_size, internal_count, tree_size, pe.DIRECTORY_ENTRY_IMPORT)
+    code = machine.build(packed_data_rva, tree_data_rva, case_size, internal_count, tree_size, pe.DIRECTORY_ENTRY_IMPORT)
     code_rva = utils.pe.align(rva_end + len(section[0]["data"]))
     section.append({
         "name" : ".text",
