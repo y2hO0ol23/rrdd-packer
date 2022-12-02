@@ -1,12 +1,10 @@
 import pefile
 import os
+import shutil
 
 import pack
-import repair
-import machine
 
 from utils import error
-import utils.pe
 
 class form:
     def __init__(self, offset, size, data, rva, option):
@@ -30,68 +28,30 @@ def start(file:str)->None:
     try:
         pe = pefile.PE(file)
     except: error.send("file : pe format error")
-    
-    if pe.FILE_HEADER.NumberOfSections == 0:
-        error.send("file : no section!")
     pe.close()
     
     # make backup and make tree
-    pe = pefile.PE(backup(file))
-    tree_data, case_size, internal_count, tree_size = pack.set_tree(file, pe.sections)
- 
-    packed = []
-    raw_end = 0
-    rva_end = 0
-    for section in pe.sections:
-        raw = section.PointerToRawData
-        size = section.SizeOfRawData
-        res = pack.run(raw, size)
+    tree_data, case_size, internal_count, tree_size = pack.set_tree(file)
+    packed, data_size = pack.run(file)
 
-        rva = section.VirtualAddress
-        option = section.Characteristics
+    code = "".join(open('./code.cpp','r').readlines())
 
-        packed.append(form(raw_end, size, res, rva, option))
-        raw_end += len(res)
-        rva_end = max(utils.pe.align(rva + size), rva_end)
+    code = code.replace('0/*@data_size*/'       , str(data_size))
+    code = code.replace('0/*@case_size*/'       , str(case_size))
+    code = code.replace('0/*@tree_size*/'       , str(tree_size))
+    code = code.replace('0/*@internal_count*/'  , str(internal_count))
+    code = code.replace('0/*@packed*/'          , str([i for i in packed])[1:-1])
+    code = code.replace('0/*@tree_data*/'       , str([i for i in tree_data])[1:-1])
 
-    packed_data = b"".join([i.data for i in packed])
+    os.remove('./builder/build/source.cpp')
+    open('./builder/build/source.cpp','w').write(code)
 
-    iat_data, iat_descriptor_size = machine.make_iat(rva_end)
+    path = os.path.dirname(os.path.realpath(__file__))
+    cmd = 'powershell.exe -c "&{Import-Module ./builder/Microsoft.VisualStudio.DevShell.dll; Enter-VsDevShell 578e8fee; cd %s/builder; msbuild}"'%path
 
-    section = [
-        {
-            "name" : ".data",
-            "data" : iat_data + packed_data + tree_data,
-            "rva" : rva_end,
-            "Characteristics" : utils.pe.IMAGE_SCN_MEM_READ  | 
-                                utils.pe.IMAGE_SCN_MEM_WRITE | 
-                                utils.pe.IMAGE_SCN_CNT_INITIALIZED_DATA
-        }
-    ]
-    
-    packed_data_rva = rva_end + len(iat_data)
-    tree_data_rva = packed_data_rva + len(packed_data)
-    code = machine.build(packed_data_rva, tree_data_rva, case_size, internal_count, tree_size, pe.DIRECTORY_ENTRY_IMPORT)
-    code_rva = utils.pe.align(rva_end + len(section[0]["data"]))
-    section.append({
-        "name" : ".text",
-        "data" : code,
-        "rva" : code_rva,
-        "Characteristics" : utils.pe.IMAGE_SCN_MEM_READ     |  
-                            utils.pe.IMAGE_SCN_MEM_EXECUTE  |
-                            utils.pe.IMAGE_SCN_CNT_CODE
-    })
-    repair.set_section(file, section)
-    
-    #print(tree_data)
-    #print(case_size, internal_count, tree_size)
-    #print(packed_data)
-    #for i in packed:
-    #    print("[%d, %d, %d, %d]"%(i.offset,i.size,i.rva,i.option))
-
-    repair.iat(file, rva_end, iat_descriptor_size)
-    repair.base(file, code_rva, rva_end)
-
+    os.system(cmd)
+    os.remove(file)
+    shutil.copy('./builder/x64/Release/build.exe', file)
 
 if __name__ == "__main__":
     error.send(error.USAGE)

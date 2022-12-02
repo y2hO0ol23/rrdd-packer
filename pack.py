@@ -4,15 +4,12 @@ from queue import PriorityQueue
 global fd, tree
 
 
-def init(pack_range:bytes)->PriorityQueue:
-    global fd
-
+def init(fd:bytes)->PriorityQueue:
     res = [0 for _ in range(0x100)]
     pq = PriorityQueue()
 
-    for st, ed in pack_range:
-        for i in range(st, ed):
-            res[fd[i]] += 1
+    for v in fd:
+        res[v] += 1
 
     for val, cnt in enumerate(res):
         if cnt != 0:
@@ -23,6 +20,8 @@ def init(pack_range:bytes)->PriorityQueue:
 
 
 def tree_data()->tuple:
+    global tree
+
     size = 1
     save = {}
     for val in range(0x100):
@@ -68,8 +67,8 @@ def tree_data()->tuple:
     return case_bin + internal_data + leaf_data, case_size, len(internal_data), size
 
 
-def build_tree(pack_range:list)->dict:
-    pq = init(pack_range)
+def build_tree(fd:bytes)->dict:
+    pq = init(fd)
 
     while pq.qsize() > 1:
         left = pq.get()[1]
@@ -83,7 +82,20 @@ def build_tree(pack_range:list)->dict:
     return tree
 
 
-def pack(data:bytes, tree:dict)->bytes:
+def set_tree(file:str)->tuple:
+    global tree
+
+    fd = b"".join(open(file, 'rb').readlines())
+    
+    tree = build_tree(fd)
+
+    return tree_data()
+
+
+def run(file:str)->tuple:
+    global tree
+    data = b"".join(open(file, 'rb').readlines())
+
     res = b""
     binary = ""
     for item in data:
@@ -95,33 +107,7 @@ def pack(data:bytes, tree:dict)->bytes:
     if len(binary) > 0:
         res += bytes([int(binary.ljust(8,'0'), 2)])
     
-    return res
-
-
-def set_tree(file:str, sections:list)->tuple:
-    global fd, tree
-
-    fd = b"".join(open(file, 'rb').readlines())
-
-    pack_range = []
-    for section in sections:
-        size = section.SizeOfRawData
-        raw = section.PointerToRawData
-        pack_range.append([raw,raw+size])
-    
-    tree = build_tree(pack_range)
-
-    return tree_data()
-
-
-def run(start, size)->bytes:
-    global fd, tree
-    
-    data = fd[start:start+size]
-
-    res = pack(data, tree)
-
-    return res
+    return res, len(data)
     
 
 if __name__ == "__main__":

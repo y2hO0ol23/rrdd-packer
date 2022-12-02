@@ -10,13 +10,6 @@ except:
     subprocess.check_call([sys.executable,'-m', 'pip', 'install', '--upgrade', 'pefile'])
     import pefile
 
-try:
-    import keystone
-except:
-    subprocess.check_call([sys.executable,'-m', 'pip', 'install', '--upgrade', 'pip'])
-    subprocess.check_call([sys.executable,'-m', 'pip', 'install', '--upgrade', 'keystone-engine'])
-    import keystone
-
 from utils import error
 
 def main()->None:
